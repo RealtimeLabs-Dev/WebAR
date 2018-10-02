@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>WebAR Prototype</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+		</style>
+	</head>
+
+	<body>
+		<script src="js/three.min.js"></script>
+		<script src="js/inflate.min.js"></script>
+		<script src="js/FBXLoader.js"></script>
+		<script src="js/WebGL.js"></script>
+		<script src="js/stats.min.js"></script>
+		<script src="js/ar.min.js"></script>
+
+		<script>
+			if (WEBGL.isWebGLAvailable() === false) 
+			{
+				document.body.appendChild(WEBGL.getWebGLErrorMessage());
+			}
+
+			var container, stats, controls, arToolkitSource, arToolkitContext;
+			var camera, scene, renderer, light;
+			var missedFrames = 0;
+
+			var clock = new THREE.Clock();
+
+			var mixers = [];
+
+			init();
+			initAR();
+			animate();
+
+			function init()
+			{
+				container = document.createElement('div');
+				document.body.appendChild( container );
+
+				scene = new THREE.Scene();				
+
+				camera = new THREE.Camera();
+				scene.add(camera);
+
+				light = new THREE.DirectionalLight(0xffffff);
+				light.position.set( 0, 200, 100 );
+				light.castShadow = true;
+				light.shadow.camera.top = 180;
+				light.shadow.camera.bottom = -100;
+				light.shadow.camera.left = -120;
+				light.shadow.camera.right = 120;
+				scene.add( light );
+
+				// model
+				var loader = new THREE.FBXLoader();
+				loader.load('data/SambaDancing.fbx', function(object) {
+
+					object.mixer = new THREE.AnimationMixer(object);
+					mixers.push(object.mixer);
+
+					var action = object.mixer.clipAction(object.animations[0]);
+					action.play();
+
+					object.traverse(function(child) {
+						if (child.isMesh) {
+							child.castShadow = true;
+							child.receiveShadow = true;
+						}
+					});
+					object.scale.set(.01, .01, .01);
+					scene.add(object);
+				});
+
+				renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true});
+				renderer.setPixelRatio(window.devicePixelRatio);
+				renderer.setClearColor(new THREE.Color('lightgrey'), 0);
+				renderer.setSize(window.innerWidth, window.innerHeight);
+				renderer.shadowMap.enabled = true;
+				container.appendChild(renderer.domElement);
+
+				window.addEventListener('resize', onWindowResize, false);
+
+				// stats
+				stats = new Stats();
+				container.appendChild(stats.dom);
+				
+				scene.visible = false;
+			}
+
+			//
+
+			function initAR()
+			{
+				arToolkitSource = new THREEx.ArToolkitSource({
+					sourceType : 'webcam',
+				});
+
+				arToolkitSource.init(function onReady(){
+					onWindowResize();
+				});
+
+				arToolkitContext = new THREEx.ArToolkitContext({
+					cameraParametersUrl: 'data/camera_para.dat',
+					detectionMode: 'mono',
+				});
+				
+				arToolkitContext.init(function onCompleted(){
+					camera.projectionMatrix.copy(arToolkitContext.getProjectionMatrix());
+				});
+
+				// init controls for camera
+				var markerControls = new THREEx.ArMarkerControls(arToolkitContext, camera, {
+					type : 'pattern',
+					patternUrl : 'data/boehringer.patt',
+					changeMatrixMode: 'cameraTransformMatrix'
+				});
+			}
+
+			//
+
+			function onWindowResize() 
+			{
+				arToolkitSource.onResizeElement();
+				arToolkitSource.copyElementSizeTo(renderer.domElement);
+				if(arToolkitContext.arController !== null)
+				{
+					arToolkitSource.copyElementSizeTo(arToolkitContext.arController.canvas);
+				}
+			}
+
+			//
+
+			function animate() 
+			{
+				requestAnimationFrame(animate);
+
+				if(arToolkitSource.ready === false)
+				{
+					return;
+				}
+				
+				arToolkitContext.update(arToolkitSource.domElement);
+				// update scene.visible if the marker is seen
+				if (camera.visible)
+				{
+					scene.visible = camera.visible;
+					missedFrames = 0;
+				}
+				else
+				{
+					missedFrames += 1;
+					if (missedFrames > 10)
+					{
+						scene.visible = false;
+					}
+				}
+				
+				if (mixers.length > 0) 
+				{
+					for (var i = 0; i < mixers.length; i++) 
+					{
+						mixers[i].update(clock.getDelta());
+					}
+				}
+
+				renderer.render(scene, camera);
+				stats.update();
+			}
+
+		</script>
+	</body>
+</html>
