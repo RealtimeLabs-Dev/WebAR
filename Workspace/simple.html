@@ -36,7 +36,7 @@
 			var camera, scene, renderer, light;
 			var missedFrames = 0;
 			var patternPath = 'data/pattern-marker.patt';
-
+			
 			var clock = new THREE.Clock();
 
 			var mixers = [];
@@ -65,7 +65,7 @@
 				scene.add( light );
 
 				// model
-				var loader = new THREE.FBXLoader();
+				/*var loader = new THREE.FBXLoader();
 				loader.load('data/SambaDancing.fbx', function(object) {
 
 					object.mixer = new THREE.AnimationMixer(object);
@@ -82,7 +82,13 @@
 					});
 					object.scale.set(.01, .01, .01);
 					scene.add(object);
-				});
+				});*/
+
+				var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+				var material = new THREE.MeshLambertMaterial( {color: 0x00ff00} );
+				var cube = new THREE.Mesh( geometry, material );
+				cube.position.set( 0, 0.5, 0 );
+				scene.add( cube );
 
 				renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true});
 				renderer.setPixelRatio(window.devicePixelRatio);
